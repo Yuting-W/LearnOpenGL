@@ -1,7 +1,7 @@
 #ifndef  MESH_H
 #define  MESH_H
 
-#include<glad/glad.h>
+#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -9,7 +9,6 @@
 
 #include <string>
 #include <vector>
-using namespace std;
 
 #define MAX_BONE_INFLUENCE 4
 
@@ -27,8 +26,8 @@ struct Vertex {
 
 struct Texture {
 	unsigned int id;
-	string type;
-	string path;
+	std::string type;
+	std::string path;
 };
 
 
@@ -36,13 +35,13 @@ struct Texture {
 class Mesh {
 public:
 	//mesh date
-	vector<Vertex> vertices;
-	vector<unsigned int> indices;
-	vector<Texture> textures;
+	std::vector<Vertex> vertices;
+	std::vector<unsigned int> indices;
+	std::vector<Texture> textures;
 	unsigned int VAO; 
 
 	//constuctor
-	Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+	Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures)
 	{
 		this->vertices = vertices;
 		this->indices = indices;
@@ -62,8 +61,8 @@ public:
 		{
 			glActiveTexture(GL_TEXTURE0 + i);  // active texture
 
-			string number;
-			string name = textures[i].type;
+			std::string number;
+			std::string name = textures[i].type;
 			if (name == "texture_diffuse")
 				number = std::to_string(diffuseNr);
 			else if(name == "texture_specular")
