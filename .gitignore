@@ -2,3 +2,9 @@ x64
 Project1.vcxproj
 Project1.vcxproj.filters
 Project1.vcxproj.user
+/shader/5.3.1.debug_quad.fs
+/shader/5.3.1.debug_quad.vs
+/shader/5.3.1.shadow_mapping.fs
+/shader/5.3.1.shadow_mapping.vs
+/shader/5.3.1.shadow_mapping_depth.fs
+/shader/5.3.1.shadow_mapping_depth.vs
