@@ -4,7 +4,7 @@ This project includes a green light source at the front-left of the model and a 
 
 Some images to show the render effect
 
-![front](screenShots/front.png)
+![front](./screenShots/front.png)
 
 ![leftfront](screenShots/leftfront.png)
 
