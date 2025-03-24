@@ -64,13 +64,13 @@ public:
 			std::string number;
 			std::string name = textures[i].type;
 			if (name == "texture_diffuse")
-				number = std::to_string(diffuseNr);
+				number = std::to_string(diffuseNr++);
 			else if(name == "texture_specular")
-				number = std::to_string(specularNr);
+				number = std::to_string(specularNr++);
 			else if (name == "texture_normal")      //used to bump texture mapping / normal Mapping
-				number = std::to_string(normalNr);
+				number = std::to_string(normalNr++);
 			else if (name == "texture_height") 
-				number = std::to_string(heightNr);
+				number = std::to_string(heightNr++);
 			glUniform1i(glGetUniformLocation(shader.ID, (name + number).c_str()), i);  // shader texture, eg: texture_diffuse1, texture_diffuse2, texture_diffuse3
 
 			

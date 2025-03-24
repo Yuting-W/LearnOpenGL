@@ -1,10 +1,11 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <texture/stb_image.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <texture/stb_image.h>
+
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -12,33 +13,11 @@
 
 #include <learnopengl/shader_s.h>
 #include <learnopengl/camera.h>
-
-#include <iostream>
-
 #include <learnopengl/model.h>
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
-unsigned int loadTexture(char const* path);
+#include <iostream>
+#include<learnopengl/Render.h>
 
-// settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-
-// camera
-Camera camera(glm::vec3(0.0f, 10.0f, 13.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
-
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// lighting
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 int main()
 {
@@ -68,8 +47,8 @@ int main()
     glfwSetScrollCallback(window, scroll_callback);
 
     // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     // glad: load all OpenGL function pointers
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -81,13 +60,74 @@ int main()
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-
+    glDepthFunc(GL_LEQUAL); // set depth function to less than AND equal for skybox depth trick.
     // build and compile our shader zprogram
     // ------------------------------------
-    Shader ourShader("./shader/3.1.model_loading.vs", "./shader/3.1.model_loading.fs");
-    Model ourModel("resources/objects/nanosuit/nanosuit.obj");
+    Shader ModelShader("./shader/6.1.PHR.vs", "./shader/6.1.PHR.fs");
+    
+    Shader backgroundShader("./shader/6.2.background.vs", "./shader/6.2.background.fs");
+    Shader planeShader("./shader/5.3.1.shadowed.vs", "./shader/5.3.1.shadowed.fs");
 
     
+
+    ModelShader.use();
+    
+    ModelShader.setInt("texture_diffuse1", 0);
+    ModelShader.setInt("texture_specular1", 1);
+    ModelShader.setInt("irradianceMap", 2);
+    ModelShader.setInt("shadowMap", 3);
+    //ModelShader.setFloat("metallic", 0.5f);
+    //ModelShader.setFloat("roughness", 0.5f);
+    ModelShader.setFloat("ao", 1.0f);
+
+    backgroundShader.use();
+    backgroundShader.setInt("environmentMap", 0);
+
+    planeShader.use();
+    planeShader.setInt("diffuseTexture", 0);
+    planeShader.setInt("shadowMap", 1);
+
+
+
+
+    Model ourModel("./resources/objects/nanosuit/nanosuit.obj");
+    // lights
+    // ------
+    glm::vec3 lightPositions[] = {
+        glm::vec3(10.0f, 10.0f, 13.0f),
+        glm::vec3(-10.0f, 10.0f, 13.0f),
+        glm::vec3(0.0f, 10.0f, 13.0f),
+        glm::vec3(0.0f, 10.0f, 13.0f),
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(900.0f,0.0f, 0.0f),
+        glm::vec3(0.0f, 900.0f, 0.0f),
+        glm::vec3(900.0f, 900.0f, 900.0f),
+        glm::vec3(900.0f, 900.0f, 900.0f)
+    };
+    int nrRows = 7;
+    int nrColumns = 7;
+    float spacing = 2.5;
+    unsigned int irradianceMap;
+    unsigned int envCubemap;
+    HDR2CubeAndIrradianceMap("./resources/hdrs/zwartkops_straight_afternoon_2k.hdr", envCubemap, irradianceMap);
+    
+    //HDR2CubeAndIrradianceMap("./resources/hdrs/meadow_4k.hdr", envCubemap, irradianceMap);
+    // then before rendering, configure the viewport to the original framebuffer's screen dimensions
+    int scrWidth, scrHeight;
+    glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
+    glViewport(0, 0, scrWidth, scrHeight);
+
+    //shadowing
+    // --------------------------------------
+    
+    // lighting
+    glm::vec3 lightPos(70,100,40);
+    //shadowing set
+    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    Shader simpleDepthShader("./shader/5.3.1.shadow_mapping_depth.vs", "./shader/5.3.1.shadow_mapping_depth.fs");
+    unsigned int depthMap, depthMapFBO;
+    ShadowingSet(SHADOW_WIDTH, SHADOW_HEIGHT, depthMap, depthMapFBO);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -106,20 +146,93 @@ int main()
         // ------
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        //
-        ourShader.use();
-
+        // render depth of scene to texture (from light's perspective)
+        // --------------------------------------------------------------
+        glm::mat4 lightProjection, lightView;
+        glm::mat4 lightSpaceMatrix;
+        float near_plane = 100.0f, far_plane = 200.5f;
+        lightProjection = glm::ortho(0.0f, 20.0f, -10.0f, 30.0f, near_plane, far_plane);
+        lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        lightSpaceMatrix = lightProjection * lightView;
+        // render scene from light's point of view
+        simpleDepthShader.use();
+        simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         glm::mat4 model = glm::mat4(1.0f);
-        ourShader.setMat4("model", model);
+        //model = glm::scale(model, glm::vec3(3.0, 3.0, 3.0));
+        model = glm::translate(model, glm::vec3(10.0, 0.0, -10.0));
+        simpleDepthShader.setMat4("model", model);
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glCullFace(GL_FRONT);
+        ourModel.Draw(simpleDepthShader);
+        glCullFace(GL_BACK);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // reset viewport
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+       
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //render model
+        //-------------------------------------------------------
+        ModelShader.use();
+        //vs
+        
+        ModelShader.setMat4("model", model);
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
+        ModelShader.setMat4("projection", projection);
+        ModelShader.setMat4("view", view);
+        glm::mat3 NormalMat = glm::transpose(glm::inverse(glm::mat3(model)));
+        ModelShader.setMat3("modelInvTrans", NormalMat);
+        ModelShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        //fs
+        // bind pre-computed IBL data
+        ModelShader.setVec3("DirectLightPos", lightPos);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        ModelShader.setVec3("camPos", camera.Position);
+        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]);  i++)
+        {
+            ModelShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
+            ModelShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+        }
+        ourModel.Draw(ModelShader);
+        // render plane 
+        //--
+        planeShader.use();
+        model = glm::mat4(1.0);
 
-        ourModel.Draw(ourShader);
-
+        float ftemp = 19.f;
+        model = glm::translate(model, glm::vec3(5.0f, ftemp, 0.0f));
+        model = glm::rotate(model,-20.f, glm::vec3(0.f,  1.f,  0.f));
+        model = glm::scale(model, glm::vec3(ftemp));
+        planeShader.setMat4("model", model);
+        planeShader.setMat4("projection", projection);
+        planeShader.setMat4("view", view);
+        // set light uniforms
+        planeShader.setVec3("viewPos", camera.Position);
+        planeShader.setVec3("lightPos", lightPos);
+        planeShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        renderPlane();
+        // render skybox (render as last to prevent overdraw)
+        //----------------------------------------------------------
+        backgroundShader.use();
+        backgroundShader.setMat4("view", view);
+        backgroundShader.setMat4("projection", projection);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        //glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap); // display irradiance map
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
         
+        renderCube();
 
 
 
@@ -142,94 +255,3 @@ int main()
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
-}
-
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
-    glViewport(0, 0, width, height);
-}
-
-
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
-{
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
-}
-
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
-    camera.ProcessMouseScroll(static_cast<float>(yoffset));
-}
-
-unsigned int loadTexture(char const* path)
-{
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-
-    int width, height, nrComponents;
-    unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data) {
-        GLenum format = GL_RED;
-        if (nrComponents == 1)
-            format = GL_RED;
-        else if (nrComponents == 3)
-            format = GL_RGB;
-        else if (nrComponents == 4)
-            format = GL_RGBA;
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        stbi_image_free(data);
-
-    }
-    else
-    {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
-        stbi_image_free(data);
-    }
-    return textureID;
-
-}

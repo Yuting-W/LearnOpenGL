@@ -12,7 +12,7 @@
 #include <learnopengl/shader_s.h>
 
 #include <string>
-unsigned int TextureFromFile(const char* path, const std::string& directory);
+extern unsigned int TextureFromFile(const char* path, const std::string& directory);
 
 class Model 
 {
@@ -87,15 +87,29 @@ class Model
 				vector.z = mesh->mVertices[i].z;
 				vertex.Position = vector;
 
-				vector.x = mesh->mNormals[i].x;
-				vector.y = mesh->mNormals[i].y;
-				vector.z = mesh->mNormals[i].z;
-				vertex.Normal = vector;
+				// normals
+				if (mesh->HasNormals())
+				{
+					vector.x = mesh->mNormals[i].x;
+					vector.y = mesh->mNormals[i].y;
+					vector.z = mesh->mNormals[i].z;
+					vertex.Normal = vector;
+				}
 				if (mesh->mTextureCoords[0])  // assimp allows multiple texture coordinates in a mesh, we only care about the first set of texture coordinates
 				{
 					vector.x = mesh->mTextureCoords[0][i].x;
 					vector.y = mesh->mTextureCoords[0][i].y;
 					vertex.TexCoords = glm::vec2(vector.x, vector.y);
+					//// tangent
+					//vector.x = mesh->mTangents[i].x;
+					//vector.y = mesh->mTangents[i].y;
+					//vector.z = mesh->mTangents[i].z;
+					//vertex.Tangent = vector;
+					//// bitangent
+					//vector.x = mesh->mBitangents[i].x;
+					//vector.y = mesh->mBitangents[i].y;
+					//vector.z = mesh->mBitangents[i].z;
+					//vertex.Bitangent = vector;
 				}
 				else
 				{
@@ -166,47 +180,7 @@ class Model
 	
 };
 
-unsigned int TextureFromFile(const char* path, const std::string& directory)
-{
-	std::string filename = std::string(path);
-	filename = directory + '/' + filename;
 
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
-	if (data)
-	{
-		GLenum format;
-		if (nrComponents == 1)
-			format = GL_RED;
-		else if (nrComponents == 3)
-			format = GL_RGB;
-		else if (nrComponents == 4)
-			format = GL_RGBA;
-		else
-			std::cout << "Texture format is error. \n";
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		stbi_image_free(data);
-	}
-	else
-	{
-		std::cout << "Texture failed to load at path: " << path << std::endl;
-		stbi_image_free(data);
-	}
-
-	return textureID;
-}
 #endif // !1
 
 
