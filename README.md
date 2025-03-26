@@ -9,3 +9,5 @@ Some images to show the render effect
 ![leftfront](screenShots/leftfront.png)
 
 ![rightfront](screenShots/rightfront.png)
+
+![self-shadowing](screenShots/self-shadowing.png)
