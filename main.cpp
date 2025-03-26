@@ -95,7 +95,7 @@ int main()
     // ------
     // lighting
     //glm::vec3 lightPos(70,100,-15);
-    glm::vec3 lightPos(100.f, 100.f, 20.f);
+    glm::vec3 lightPos(100.f, 100.f, 50.f);
     glm::vec3 lightPositions[] = {
         glm::vec3(10.0f, 10.0f, 13.0f),
         glm::vec3(-10.0f, 10.0f, 13.0f),
@@ -106,8 +106,9 @@ int main()
         glm::vec3(20.0f,0.0f, 0.0f),
         glm::vec3(0.0f, 20.0f, 0.0f),
         glm::vec3(9000.0f, 9000.0f, 9000.0f),
-        glm::vec3(9.0f, 9.0f, 9.0f)
+        glm::vec3(0.0f, 0.0f, 0.0f)
     };
+    float lightArea = 200.0f;
     int nrRows = 7;
     int nrColumns = 7;
     float spacing = 2.5;
@@ -126,7 +127,7 @@ int main()
     
     
     //shadowing set
-    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
     Shader simpleDepthShader("./shader/5.3.1.shadow_mapping_depth.vs", "./shader/5.3.1.shadow_mapping_depth.fs");
     unsigned int depthMap, depthMapFBO;
     ShadowingSet(SHADOW_WIDTH, SHADOW_HEIGHT, depthMap, depthMapFBO);
@@ -153,7 +154,7 @@ int main()
         glm::mat4 lightProjection, lightView;
         glm::mat4 lightSpaceMatrix;
         float near_plane = 100.0f, far_plane = 200.5f;
-        lightProjection = glm::ortho(-10.0f, 20.0f, -10.0f, 15.0f, near_plane, far_plane);
+        lightProjection = glm::ortho(-10.0f, 20.0f, -10.0f, 20.0f, near_plane, far_plane);
         lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         lightSpaceMatrix = lightProjection * lightView;
         // render scene from light's point of view
@@ -163,12 +164,17 @@ int main()
         //model = glm::scale(model, glm::vec3(3.0, 3.0, 3.0));
         model = glm::translate(model, glm::vec3(0.0, 0.0, -10.0));
         model = glm::rotate(model, glm::radians(-0.f), glm::vec3(0.0f, 1.0f, 0.0f));
-        simpleDepthShader.setMat4("model", model);
+        glm::mat4 model2 = glm::mat4(1.0f);
+        model2 = glm::translate(model2, glm::vec3(6.0, 0.0, -9.0));
+        
         glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
         glCullFace(GL_FRONT);
+        simpleDepthShader.setMat4("model", model);
         ourModel.Draw(simpleDepthShader);
+        //simpleDepthShader.setMat4("model", model2);
+        //ourModel.Draw(simpleDepthShader);
         glCullFace(GL_BACK);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -202,7 +208,10 @@ int main()
             ModelShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
             ModelShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
         }
+
         ourModel.Draw(ModelShader);
+        //ModelShader.setMat4("model", model2);
+        //ourModel.Draw(ModelShader);
         // render plane 
         //--
         planeShader.use();
@@ -219,6 +228,8 @@ int main()
         planeShader.setVec3("viewPos", camera.Position);
         planeShader.setVec3("lightPos", lightPos);
         planeShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        planeShader.setFloat("lightArea", lightArea);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         glActiveTexture(GL_TEXTURE1);

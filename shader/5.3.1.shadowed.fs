@@ -13,6 +13,8 @@ uniform sampler2D shadowMap;
 
 uniform vec3 lightPos;
 uniform vec3 viewPos;
+uniform float lightArea;
+
 float ShadowCalculation(vec4 fragPosLightSpace, float bias)
 {
     // perform perspective divide
@@ -24,17 +26,19 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
     // calculate the average blocker depth
-    float samples = 20.0;
-    float offset = 0.05;
+    float samples = 50.0;
+    float lightSizeUV  = lightArea; // 30 * 0.5;
+    float blockArea =  lightSizeUV * (currentDepth - 0.05)/ currentDepth;
+    float offset = blockArea;
     float averageDepth = 0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     int currentSamples = 0;
-    for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+    for(float x = -offset; x < offset; x += offset / samples)
     {
-        for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+        for(float y = -offset; y < offset; y += offset / samples)
         {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-            if(pcfDepth < currentDepth - 0.001)
+            if(pcfDepth < currentDepth - bias)
             {
                 averageDepth += pcfDepth;     
                 currentSamples++;
@@ -47,21 +51,23 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
     
     float shadow;
     samples = 50.0;
-    offset = (averageDepth < 0)? -1.0:((currentDepth - averageDepth)/averageDepth * 25.0 + 2.0);
-    currentSamples = 0;
+    offset = (averageDepth < 0)? -1.0:((currentDepth - averageDepth)/averageDepth * lightSizeUV);
+    
     if(projCoords.z > 1.0 || offset < 0.0)
     {
         shadow = 0.0;
     }    
     else
     {
-         for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+        currentSamples = 0;
+         for(float x = -offset; x < offset; x += offset / samples)
         {
-            for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+            for(float y = -offset; y < offset; y += offset / samples)
             {
                 vec2 sampleUV = projCoords.xy + vec2(x, y)* texelSize;
                 
                 float pcfDepth = texture(shadowMap, sampleUV).r; 
+
                 shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;      
                 currentSamples++;
             }    
@@ -76,8 +82,9 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
 void main()
 {           
 
+
     vec3 color = texture(diffuseTexture, normalize(fs_in.FragPos - viewPos)).rgb;
-    //vec3 color = texture(diffuseTexture, fs_in.TexCoords).rgb;
+    
     vec3 normal = normalize(fs_in.Normal);
     vec3 lightColor = vec3(1.25);
     
@@ -101,7 +108,7 @@ void main()
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = ShadowCalculation(fs_in.FragPosLightSpace,bias);
     vec3 lighting = (ambient + (1.0 - shadow) * (1.0 - ambient)) * color;    
-
+    
 
 
         // HDR tonemap and gamma correct
