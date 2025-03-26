@@ -26,8 +26,8 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
     // check whether current frag pos is in shadow
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     float shadow;
-    float samples = 4.0;
-    float offset = 0.1;
+    float samples = 7.0;
+    float offset = 2;
     if(projCoords.z > 1.0)
     {
         shadow = 0.0;
@@ -58,7 +58,7 @@ void main()
     vec3 lightColor = vec3(1.25);
     
     // ambient
-    vec3 ambient = 0.4 * lightColor;
+    vec3 ambient = 0.35 * lightColor;
     // diffuse
     //vec3 lightDir = normalize(lightPos - fs_in.FragPos);
     vec3 lightDir = normalize(lightPos - 0);
@@ -75,15 +75,8 @@ void main()
     // calculate shadow
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = ShadowCalculation(fs_in.FragPosLightSpace,bias);
-    vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
-    if(shadow > 0.99)
-    {
-        lighting = ambient  * color;    
-    }
-    else
-    {
-        lighting = color;    
-    }  
+    vec3 lighting = (ambient + (1.0 - shadow) * (1.0 - ambient)) * color;    
+
 
 
         // HDR tonemap and gamma correct
