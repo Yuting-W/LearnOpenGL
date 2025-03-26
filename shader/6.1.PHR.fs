@@ -34,7 +34,7 @@ float GeometrySmith(vec3 LightVec, vec3 camVec, vec3 normalVec, float roughness)
 vec3 fresnelSchlick(float HdotN, vec3 F0);
 
 //is shadowed?
-float ShadowCalculation(vec4 fragPosLightSpace);
+float ShadowCalculation(vec4 fragPosLightSpace, float bias);
 void main()
 {
     vec3 N = normalize(Normal);
@@ -49,7 +49,7 @@ void main()
     float roughness = 1.0 - specularIntensity;
     roughness = pow(roughness, 2.0); // 增强对比度
 
-    vec3 albedo = mix(diffuseColor, specularColor, metallic);
+    vec3 albedo = 5.0 * mix(diffuseColor, specularColor, metallic);
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
     // reflectance equation
@@ -81,9 +81,11 @@ void main()
         Kd *= (1 - metallic);
         // scale light by NdotL
         float NdotL = max(dot(N, L), 0.0);   
+         
 
-        // add to outgoing radiance Lo
         Lo += (Kd * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again 
+
+        
 
 
     }
@@ -98,9 +100,12 @@ void main()
     // this ambient lighting with environment lighting
     vec3 ambient = vec3(0.03) * albedo * ao;
 
-    // calculate shadow
-    float shadow = ShadowCalculation(FragPosLightSpace);   
-    vec3 color = ambient +  Lo;
+    // calculate 
+    vec3 lightDir = normalize(lightPositions[3] - FragPos);
+
+    float bias = max(0.005 * (1.0 - dot(N, lightDir)), 0.0005);
+    float shadow = ShadowCalculation(FragPosLightSpace,bias);  
+    vec3 color = (1-shadow) * ambient +   Lo;
     //vec3 color = ambient +  Lo;
     // HDR tonemapping
     color = color / (color + vec3(1.0));
@@ -145,9 +150,9 @@ vec3 fresnelSchlick(float HdotN, vec3 F0)
 }
 
 //is shadowed?
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation(vec4 fragPosLightSpace, float bias)
 {
-    // perform perspective divide
+        // perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
@@ -155,9 +160,51 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     float closestDepth = texture(shadowMap, projCoords.xy).r; 
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
+    // calculate the average blocker depth
+    float samples = 20.0;
+    float offset = 1.0;
+    float averageDepth = currentDepth;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    float currentSamples = 1.0;
+    for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+    {
+        for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+        {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            if(pcfDepth < 1.0)
+            {
+                averageDepth += pcfDepth;     
+                currentSamples++;
+            }
+               
+        }    
+    }
+    averageDepth /=(currentSamples);
     // check whether current frag pos is in shadow
-    float shadow = currentDepth > closestDepth  ? 1.0 : 0.0;
-
+    
+    float shadow;
+    samples = 50.0;
+    offset = (currentDepth - averageDepth)/averageDepth * 8.0 + 4.0;
+    //offset = (currentDepth - closestDepth+ 0.1)/closestDepth * 10.0 + 5.0;
+    //offset = 5.0;
+    if(projCoords.z > 1.0)
+    {
+        shadow = 0.0;
+    }    
+    else
+    {
+         for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+        {
+            for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+            {
+                float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+            }    
+        }
+        shadow /= (samples * samples);
+    }
+    
+    
     return shadow;
 }
 

@@ -23,11 +23,33 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
     float closestDepth = texture(shadowMap, projCoords.xy).r; 
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    // check whether current frag pos is in shadow
+    // calculate the average blocker depth
+    float samples = 20.0;
+    float offset = 1.0;
+    float averageDepth = currentDepth;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    float currentSamples = 1.0;
+    for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+    {
+        for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+        {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            if(pcfDepth < 1.0)
+            {
+                averageDepth += pcfDepth;     
+                currentSamples++;
+            }
+               
+        }    
+    }
+    averageDepth /=(currentSamples);
+    // check whether current frag pos is in shadow
+    
     float shadow;
-    float samples = 7.0;
-    float offset = 2;
+    samples = 50.0;
+    offset = (currentDepth - averageDepth)/averageDepth * 8.0 + 4.0;
+    //offset = (currentDepth - closestDepth+ 0.1)/closestDepth * 10.0 + 5.0;
+    //offset = 5.0;
     if(projCoords.z > 1.0)
     {
         shadow = 0.0;
@@ -58,6 +80,7 @@ void main()
     vec3 lightColor = vec3(1.25);
     
     // ambient
+
     vec3 ambient = 0.35 * lightColor;
     // diffuse
     //vec3 lightDir = normalize(lightPos - fs_in.FragPos);

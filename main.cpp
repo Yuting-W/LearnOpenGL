@@ -93,17 +93,20 @@ int main()
     Model ourModel("./resources/objects/nanosuit/nanosuit.obj");
     // lights
     // ------
+    // lighting
+    //glm::vec3 lightPos(70,100,-15);
+    glm::vec3 lightPos(70.f, 100.f, 20.f);
     glm::vec3 lightPositions[] = {
         glm::vec3(10.0f, 10.0f, 13.0f),
         glm::vec3(-10.0f, 10.0f, 13.0f),
-        glm::vec3(0.0f, 10.0f, 13.0f),
-        glm::vec3(0.0f, 10.0f, 13.0f),
+        lightPos,
+        lightPos,
     };
     glm::vec3 lightColors[] = {
-        glm::vec3(900.0f,0.0f, 0.0f),
-        glm::vec3(0.0f, 900.0f, 0.0f),
-        glm::vec3(900.0f, 900.0f, 900.0f),
-        glm::vec3(900.0f, 900.0f, 900.0f)
+        glm::vec3(20.0f,0.0f, 0.0f),
+        glm::vec3(0.0f, 20.0f, 0.0f),
+        glm::vec3(9000.0f, 9000.0f, 9000.0f),
+        glm::vec3(9.0f, 9.0f, 9.0f)
     };
     int nrRows = 7;
     int nrColumns = 7;
@@ -121,9 +124,7 @@ int main()
     //shadowing
     // --------------------------------------
     
-    // lighting
-    //glm::vec3 lightPos(70,100,-15);
-    glm::vec3 lightPos(70, 100, 20);
+    
     //shadowing set
     const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
     Shader simpleDepthShader("./shader/5.3.1.shadow_mapping_depth.vs", "./shader/5.3.1.shadow_mapping_depth.fs");
@@ -152,7 +153,7 @@ int main()
         glm::mat4 lightProjection, lightView;
         glm::mat4 lightSpaceMatrix;
         float near_plane = 100.0f, far_plane = 200.5f;
-        lightProjection = glm::ortho(-30.0f, 30.0f, -30.0f, 30.0f, near_plane, far_plane);
+        lightProjection = glm::ortho(-10.0f, 20.0f, -10.0f, 15.0f, near_plane, far_plane);
         lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         lightSpaceMatrix = lightProjection * lightView;
         // render scene from light's point of view
@@ -160,8 +161,8 @@ int main()
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         glm::mat4 model = glm::mat4(1.0f);
         //model = glm::scale(model, glm::vec3(3.0, 3.0, 3.0));
-        model = glm::translate(model, glm::vec3(10.0, 0.0, -10.0));
-        model = glm::rotate(model, -20.f, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::translate(model, glm::vec3(0.0, 0.0, -10.0));
+        model = glm::rotate(model, glm::radians(-0.f), glm::vec3(0.0f, 1.0f, 0.0f));
         simpleDepthShader.setMat4("model", model);
         glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
