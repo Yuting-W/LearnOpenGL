@@ -25,16 +25,16 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
     float currentDepth = projCoords.z;
     // calculate the average blocker depth
     float samples = 20.0;
-    float offset = 1.0;
-    float averageDepth = currentDepth;
+    float offset = 0.05;
+    float averageDepth = 0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    float currentSamples = 1.0;
+    int currentSamples = 0;
     for(float x = -offset; x < offset; x += offset / (samples * 0.5))
     {
         for(float y = -offset; y < offset; y += offset / (samples * 0.5))
         {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-            if(pcfDepth < 1.0)
+            if(pcfDepth < currentDepth - 0.001)
             {
                 averageDepth += pcfDepth;     
                 currentSamples++;
@@ -42,15 +42,14 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
                
         }    
     }
-    averageDepth /=(currentSamples);
+    averageDepth = currentSamples > 0 ? (averageDepth/currentSamples) : -1.0;
     // check whether current frag pos is in shadow
     
     float shadow;
     samples = 50.0;
-    offset = (currentDepth - averageDepth)/averageDepth * 8.0 + 4.0;
-    //offset = (currentDepth - closestDepth+ 0.1)/closestDepth * 10.0 + 5.0;
-    //offset = 5.0;
-    if(projCoords.z > 1.0)
+    offset = (averageDepth < 0)? -1.0:((currentDepth - averageDepth)/averageDepth * 25.0 + 2.0);
+    currentSamples = 0;
+    if(projCoords.z > 1.0 || offset < 0.0)
     {
         shadow = 0.0;
     }    
@@ -60,11 +59,14 @@ float ShadowCalculation(vec4 fragPosLightSpace, float bias)
         {
             for(float y = -offset; y < offset; y += offset / (samples * 0.5))
             {
-                float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+                vec2 sampleUV = projCoords.xy + vec2(x, y)* texelSize;
+                
+                float pcfDepth = texture(shadowMap, sampleUV).r; 
+                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;      
+                currentSamples++;
             }    
         }
-        shadow /= (samples * samples);
+        shadow /= currentSamples;
     }
     
     

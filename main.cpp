@@ -95,7 +95,7 @@ int main()
     // ------
     // lighting
     //glm::vec3 lightPos(70,100,-15);
-    glm::vec3 lightPos(70.f, 100.f, 20.f);
+    glm::vec3 lightPos(100.f, 100.f, 20.f);
     glm::vec3 lightPositions[] = {
         glm::vec3(10.0f, 10.0f, 13.0f),
         glm::vec3(-10.0f, 10.0f, 13.0f),
@@ -208,7 +208,7 @@ int main()
         planeShader.use();
         model = glm::mat4(1.0);
 
-        float ftemp = 19.f;
+        float ftemp = 30.f;
         model = glm::translate(model, glm::vec3(5.0f, ftemp, 0.0f));
         model = glm::rotate(model,-20.f, glm::vec3(0.f,  1.f,  0.f));
         model = glm::scale(model, glm::vec3(ftemp));

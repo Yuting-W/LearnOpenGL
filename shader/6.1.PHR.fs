@@ -81,10 +81,16 @@ void main()
         Kd *= (1 - metallic);
         // scale light by NdotL
         float NdotL = max(dot(N, L), 0.0);   
-         
-
-        Lo += (Kd * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again 
-
+        if(i == 2)
+        {
+            float bias = max(0.005 * (1.0 - dot(N, L)), 0.0005);
+            float shadow = ShadowCalculation(FragPosLightSpace,bias);  
+            Lo += (1 - shadow) * (Kd * albedo / PI + specular) * radiance * NdotL;
+        }
+        else
+        {
+            Lo += (Kd * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again 
+        }
         
 
 
@@ -103,10 +109,7 @@ void main()
     // calculate 
     vec3 lightDir = normalize(lightPositions[3] - FragPos);
 
-    float bias = max(0.005 * (1.0 - dot(N, lightDir)), 0.0005);
-    float shadow = ShadowCalculation(FragPosLightSpace,bias);  
-    vec3 color = (1-shadow) * ambient +   Lo;
-    //vec3 color = ambient +  Lo;
+    vec3 color = ambient +  Lo;
     // HDR tonemapping
     color = color / (color + vec3(1.0));
     // gamma correct
